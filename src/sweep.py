@@ -1,14 +1,15 @@
 """
-Distance sweep + plot for the clean BB84 GLLP engine (Milestone 1).
+Distance sweep + plots for the BB84 GLLP engine.
 
-Sweeps the single free variable -- distance L (channel loss) -- and plots
-the SECURE key rate R vs L from secret_key_rate() in keyrate.py. Everything
-else (mu, dark counts, detector efficiency, misalignment, f, q) is frozen at
-the GYS values defined in keyrate.
+Sweeps the single free variable -- distance L (channel loss) -- and plots the
+SECURE key rate R vs L. Everything else (dark counts, detector efficiency,
+misalignment, f, q, and -- for the decoy curve -- mu) is frozen at the GYS
+values in keyrate.
 
-This is the CLEAN-protocol curve: no eavesdropper, true single-photon
-Y_1/e_1 fed straight into LMC Eq. 11. It is the optimistic ceiling, and its
-cutoff (~149 km) should sit near LMC Fig. 1's decoy curve (~140 km).
+Milestone 1: the clean/decoy-ceiling curve alone (secret_key_rate, Eq. 11).
+Milestone 2, Pair 1: adds the no-decoy PNS-crash curve (Eq. 12/13 with mu
+re-optimized per distance) and the insecurity bound (true e_1 = 1/4), so the
+figure reproduces the three curves of LMC Fig. 1.
 """
 
 import os
@@ -20,25 +21,26 @@ import matplotlib.pyplot as plt
 # correctly no matter which directory the script is run from.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_clean_keyrate.png")
+PAIR1_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_pair1_pns_crash.png")
 
 from keyrate import (
-    secret_key_rate, eta_overall,
+    secret_key_rate, optimize_no_decoy, e_1, eta_overall,
     MU, P_DARK, E_DETECTOR, F_EC, Q_SIFT,
 )
 
-# Sweep range for the single swept variable, distance L (km).
+# Sweep range for the single swept variable, distance L (km). Extends past the
+# ~208 km insecurity bound so that bound is visible on the plot.
 L_MIN_KM = 0.0
-L_MAX_KM = 200.0
-L_POINTS = 400
+L_MAX_KM = 220.0
+L_POINTS = 440
 
 
 def sweep_key_rate(L_km):
     """
-    Secure key rate R at each distance in L_km (an array of km values).
+    Decoy/ceiling secure key rate at each L (LMC Eq. 11, frozen mu = MU).
 
-    Returns a numpy array of R per pulse (LMC Eq. 11). Values may be
-    negative past the cutoff -- masking for the plot is done separately so
-    this stays the raw engine output.
+    Returns a numpy array of R per pulse. Values may be negative past the
+    cutoff -- masking for the plot is done separately so this stays raw.
     """
     return np.array([
         secret_key_rate(MU, eta_overall(L), P_DARK, E_DETECTOR, f=F_EC, q=Q_SIFT)
@@ -46,40 +48,63 @@ def sweep_key_rate(L_km):
     ])
 
 
+def sweep_no_decoy(L_km):
+    """
+    No-decoy (PNS-crash) secure key rate at each L, with mu RE-OPTIMIZED at
+    every distance (LMC Eq. 12, MQZL p.6 "maximize R over mu" -- see
+    optimize_no_decoy). Returns a numpy array of the best R per pulse.
+    """
+    return np.array([
+        optimize_no_decoy(eta_overall(L), P_DARK, E_DETECTOR, f=F_EC, q=Q_SIFT)[0]
+        for L in L_km
+    ])
+
+
 def cutoff_distance(L_km, R):
     """
     Maximum secure distance: the L where R crosses from positive to
-    non-positive. Linearly interpolated between the two straddling sample
-    points. Returns None if R never crosses (all positive or all negative).
+    non-positive, linearly interpolated between the straddling samples.
+    Returns None if R never crosses.
     """
     R = np.asarray(R)
     sign_change = np.where((R[:-1] > 0) & (R[1:] <= 0))[0]
     if len(sign_change) == 0:
         return None
     i = sign_change[0]
-    # linear interpolation of the zero crossing between L[i] and L[i+1]
     frac = R[i] / (R[i] - R[i + 1])
     return L_km[i] + frac * (L_km[i + 1] - L_km[i])
 
 
+def insecurity_distance():
+    """
+    Distance where the true single-photon error e_1 reaches 1/4 -- LMC's
+    absolute insecurity bound (intercept-resend gives 25% QBER, so beyond
+    this no protocol, decoy or not, is secure). Found by bisection on e_1.
+    """
+    lo, hi = 0.0, 400.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if e_1(eta_overall(mid), P_DARK, E_DETECTOR) < 0.25:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
 def plot_key_rate(L_km, R, cutoff=None, outfile=DEFAULT_OUTFILE):
     """
-    Plot the SECURE key rate vs distance on a log-y axis and save to outfile.
-
-    Points where R <= 0 are masked (no secure key -> no line), so the curve
-    ends naturally at the cutoff distance rather than being floored to zero.
+    Milestone-1 single-curve plot: SECURE key rate vs distance (log-y).
+    Points where R <= 0 are masked so the curve ends at the cutoff.
     """
     R = np.asarray(R)
-    R_secure = np.where(R > 0, R, np.nan)   # mask insecure region
+    R_secure = np.where(R > 0, R, np.nan)
 
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.semilogy(L_km, R_secure, color="#1f4e79", lw=2,
                 label="BB84 clean GLLP (true $Y_1, e_1$)")
-
     if cutoff is not None:
         ax.axvline(cutoff, color="#c00000", ls="--", lw=1,
                    label=f"cutoff $\\approx$ {cutoff:.0f} km")
-
     ax.set_xlabel("Distance L (km)")
     ax.set_ylabel("Secure key rate R (per pulse)")
     ax.set_title("BB84 clean GLLP engine — secure key rate vs distance\n"
@@ -92,9 +117,48 @@ def plot_key_rate(L_km, R, cutoff=None, outfile=DEFAULT_OUTFILE):
     return fig
 
 
+def plot_pair1(L_km, R_decoy, R_no_decoy, insecurity, outfile=PAIR1_OUTFILE):
+    """
+    Milestone-2 Pair-1 plot: decoy-ceiling vs no-decoy PNS-crash, plus the
+    insecurity bound, reproducing LMC Fig. 1's structure. Insecure points
+    (R <= 0) are masked so each curve ends at its own cutoff.
+    """
+    # Cutoffs from the RAW (signed) arrays passed in, BEFORE masking -- do not
+    # re-run the sweeps (the no-decoy sweep is ~220k rate evals).
+    c_decoy = cutoff_distance(L_km, R_decoy)
+    c_nod = cutoff_distance(L_km, R_no_decoy)
+    R_decoy = np.where(np.asarray(R_decoy) > 0, R_decoy, np.nan)
+    R_no_decoy = np.where(np.asarray(R_no_decoy) > 0, R_no_decoy, np.nan)
+
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    ax.semilogy(L_km, R_decoy, color="#1f4e79", lw=2,
+                label=f"GLLP ceiling (infinite decoy, true $Y_1,e_1$)  cutoff $\\approx${c_decoy:.0f} km")
+    ax.semilogy(L_km, R_no_decoy, color="#c0392b", lw=2,
+                label=f"GLLP no decoy ($\\mu$ re-opt., PNS crash)  cutoff $\\approx${c_nod:.0f} km")
+    ax.axvline(insecurity, color="#555555", ls="--", lw=1.2,
+               label=f"insecurity bound ($e_1=1/4$) $\\approx${insecurity:.0f} km")
+
+    ax.set_xlabel("Distance L (km)")
+    ax.set_ylabel("Secure key rate R (per pulse)")
+    ax.set_title("BB84 Pair 1: PNS attack — infinite-decoy ceiling vs no-decoy crash\n"
+                 f"(GYS params, $q={Q_SIFT}$, $f={F_EC}$)")
+    ax.grid(True, which="both", ls=":", alpha=0.5)
+    ax.legend(loc="lower left", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(outfile, dpi=150)
+    print(f"saved {outfile}")
+    return fig
+
+
 if __name__ == "__main__":
     L_km = np.linspace(L_MIN_KM, L_MAX_KM, L_POINTS)
-    R = sweep_key_rate(L_km)
-    cutoff = cutoff_distance(L_km, R)
-    print(f"max secure distance ~ {cutoff:.1f} km" if cutoff else "no cutoff found")
-    plot_key_rate(L_km, R, cutoff)
+
+    R_decoy = sweep_key_rate(L_km)
+    R_no_decoy = sweep_no_decoy(L_km)
+    insecurity = insecurity_distance()
+
+    print(f"decoy/ceiling cutoff ~ {cutoff_distance(L_km, R_decoy):.1f} km")
+    print(f"no-decoy crash cutoff ~ {cutoff_distance(L_km, R_no_decoy):.1f} km")
+    print(f"insecurity bound (e_1=1/4) ~ {insecurity:.1f} km")
+
+    plot_pair1(L_km, R_decoy, R_no_decoy, insecurity)
