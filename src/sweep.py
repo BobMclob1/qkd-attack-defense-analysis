@@ -27,6 +27,7 @@ PAIR1_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_pair1_pns_crash.png")
 from keyrate import e_1, eta_overall, MU, P_DARK, E_DETECTOR, F_EC, Q_SIFT
 from ceiling import ceiling_key_rate
 from no_decoy import optimize_no_decoy
+from decoy import decoy_key_rate, NU
 
 # Sweep range for the single swept variable, distance L (km). Extends past the
 # ~208 km insecurity bound so that bound is visible on the plot.
@@ -57,6 +58,18 @@ def sweep_no_decoy(L_km):
     """
     return np.array([
         optimize_no_decoy(eta_overall(L), P_DARK, E_DETECTOR, f=F_EC, q=Q_SIFT)[0]
+        for L in L_km
+    ])
+
+
+def sweep_decoy(L_km):
+    """
+    Vacuum+Weak decoy secure key rate at each L (MQZL Eqs. 34/35/37 -> Eq. 26),
+    with frozen signal mu = MU and weak decoy nu = NU. Returns a numpy array of
+    R per pulse. This is the real decoy-RECOVERY curve.
+    """
+    return np.array([
+        decoy_key_rate(MU, eta_overall(L), P_DARK, E_DETECTOR, nu=NU, f=F_EC, q=Q_SIFT)
         for L in L_km
     ])
 
@@ -118,22 +131,27 @@ def plot_key_rate(L_km, R, cutoff=None, outfile=DEFAULT_OUTFILE):
     return fig
 
 
-def plot_pair1(L_km, R_ceiling, R_no_decoy, insecurity, outfile=PAIR1_OUTFILE):
+def plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy, insecurity, outfile=PAIR1_OUTFILE):
     """
-    Milestone-2 Pair-1 plot: infinite-decoy ceiling vs no-decoy PNS-crash,
-    plus the insecurity bound, reproducing LMC Fig. 1's structure. Insecure
-    points (R <= 0) are masked so each curve ends at its own cutoff.
+    Milestone-2 Pair-1 plot: the three-curve PNS story -- infinite-decoy
+    ceiling, practical Vacuum+Weak decoy RECOVERY, and no-decoy PNS crash --
+    plus the insecurity bound, reproducing LMC Fig. 1. Insecure points
+    (R <= 0) are masked so each curve ends at its own cutoff.
     """
     # Cutoffs from the RAW (signed) arrays passed in, BEFORE masking -- do not
     # re-run the sweeps (the no-decoy sweep is ~220k rate evals).
     c_ceiling = cutoff_distance(L_km, R_ceiling)
+    c_decoy = cutoff_distance(L_km, R_decoy)
     c_nod = cutoff_distance(L_km, R_no_decoy)
     R_ceiling = np.where(np.asarray(R_ceiling) > 0, R_ceiling, np.nan)
+    R_decoy = np.where(np.asarray(R_decoy) > 0, R_decoy, np.nan)
     R_no_decoy = np.where(np.asarray(R_no_decoy) > 0, R_no_decoy, np.nan)
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
-    ax.semilogy(L_km, R_ceiling, color="#1f4e79", lw=2,
+    ax.semilogy(L_km, R_ceiling, color="#1f4e79", lw=2, ls="--",
                 label=f"GLLP ceiling (infinite decoy, true $Y_1,e_1$)  cutoff $\\approx${c_ceiling:.0f} km")
+    ax.semilogy(L_km, R_decoy, color="#2e8b57", lw=2,
+                label=f"Vacuum+Weak decoy ($\\nu={NU}$, MQZL)  cutoff $\\approx${c_decoy:.0f} km")
     ax.semilogy(L_km, R_no_decoy, color="#c0392b", lw=2,
                 label=f"GLLP no decoy ($\\mu$ re-opt., PNS crash)  cutoff $\\approx${c_nod:.0f} km")
     ax.axvline(insecurity, color="#555555", ls="--", lw=1.2,
@@ -141,7 +159,7 @@ def plot_pair1(L_km, R_ceiling, R_no_decoy, insecurity, outfile=PAIR1_OUTFILE):
 
     ax.set_xlabel("Distance L (km)")
     ax.set_ylabel("Secure key rate R (per pulse)")
-    ax.set_title("BB84 Pair 1: PNS attack — infinite-decoy ceiling vs no-decoy crash\n"
+    ax.set_title("BB84 Pair 1: PNS attack — decoy recovery vs no-decoy crash\n"
                  f"(GYS params, $q={Q_SIFT}$, $f={F_EC}$)")
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend(loc="lower left", fontsize=9)
@@ -155,11 +173,13 @@ if __name__ == "__main__":
     L_km = np.linspace(L_MIN_KM, L_MAX_KM, L_POINTS)
 
     R_ceiling = sweep_ceiling(L_km)
+    R_decoy = sweep_decoy(L_km)
     R_no_decoy = sweep_no_decoy(L_km)
     insecurity = insecurity_distance()
 
     print(f"ceiling cutoff ~ {cutoff_distance(L_km, R_ceiling):.1f} km")
+    print(f"decoy (Vacuum+Weak) cutoff ~ {cutoff_distance(L_km, R_decoy):.1f} km")
     print(f"no-decoy crash cutoff ~ {cutoff_distance(L_km, R_no_decoy):.1f} km")
     print(f"insecurity bound (e_1=1/4) ~ {insecurity:.1f} km")
 
-    plot_pair1(L_km, R_ceiling, R_no_decoy, insecurity)
+    plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy, insecurity)
