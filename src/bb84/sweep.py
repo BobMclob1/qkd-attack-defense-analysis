@@ -18,9 +18,9 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Repo root = parent of this file's directory (src/), so figures/ resolves
-# correctly no matter which directory the script is run from.
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Repo root = three levels up from this file (src/bb84/sweep.py -> repo), so
+# figures/ resolves correctly no matter which directory the script is run from.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_clean_keyrate.png")
 PAIR1_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_pair1_pns_crash.png")
 
