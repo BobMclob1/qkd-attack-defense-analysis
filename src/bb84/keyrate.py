@@ -1,63 +1,36 @@
 """
-Shared core for the BB84 key-rate engine: frozen constants, the device model
-(yields / gains / QBER), binary entropy, and the GLLP Eq.-11 secure-key-rate
-combiner. Protocol-specific curves live in sibling modules that import from
-here:
+BB84 device model + GLLP key-rate combiner. This is the BB84 "engine": the
+coherent-source Poisson gain model (yields / gains / QBER) and the GLLP
+Eq.-11 combiner gllp_key_rate. Protocol-specific curves live in sibling
+modules that import from here:
     ceiling.py  -- infinite-decoy ceiling (true Y1/e1 -> gllp_key_rate)
     no_decoy.py -- prior-art GLLP / PNS-crash bound (Eqs. 12, 13)
     decoy.py    -- practical Vacuum+Weak decoy estimators (MQZL)
 
-Equations coded directly from Lo, Ma & Chen (LMC), "Decoy State Quantum Key
-Distribution", arXiv:quant-ph/0411004v4, PRL 94, 230504 (2005). Equation
-numbers in comments refer to that paper unless noted otherwise.
+Cross-protocol infrastructure (binary_entropy, the fiber loss law, and the
+shared constants ALPHA/F_EC/Q_SIFT) lives in src/shared.py so BBM92 can reuse
+it. Equations coded directly from Lo, Ma & Chen (LMC), "Decoy State Quantum
+Key Distribution", arXiv:quant-ph/0411004v4, PRL 94, 230504 (2005).
 """
 
-from math import log2, exp, factorial
+import os
+import sys
+# Put src/ on the path so `from shared import ...` resolves when this module is
+# run from inside src/bb84/ (shared.py lives one directory up).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from math import exp, factorial
 
-def binary_entropy(x):
-    """
-    Binary Shannon entropy H2(x) = -x log2(x) - (1-x) log2(1-x).
+from shared import binary_entropy, ALPHA_DB_PER_KM, transmittance, F_EC, Q_SIFT
 
-    Definition used inside LMC Eq. 11.
-    H2(0) = H2(1) = 0 by the limit x*log2(x) -> 0 as x -> 0:
-    a certain outcome carries no uncertainty. if equal to 0 or 1, more certain
-    """
-    if x <= 0 or x >= 1:
-        return 0.0
-    return -x * log2(x) - (1 - x) * log2(1 - x)
-
-''' --- Frozen physical constants (GYS experiment, LMC Fig. 1 validation) ---
- Named per project convention so they can be deliberately un-frozen as
- "twists" later. Values are the GYS parameter set LMC validate against.'''
-ALPHA_DB_PER_KM = 0.21    # GYS fiber loss coefficient (dB/km), MQZL Table 1.
-                          # Was 0.20 (rounded); corrected to the sourced GYS
-                          # value. Reach ~ 1/alpha, so this shift lands the
-                          # Fig.1 validation: insecurity bound -> 208 km exact,
-                          # decoy reach -> 142 km (~140).
+# --- BB84-specific frozen constants (GYS experiment, LMC Fig. 1 validation) ---
+# Named per project convention so they can be un-frozen as "twists" later.
+# (The shared channel/EC/sifting constants ALPHA_DB_PER_KM, F_EC, Q_SIFT are
+# imported from shared above.)
 ETA_DET = 0.045           # Bob's detector efficiency (dimensionless)
 P_DARK = 1.7e-6           # dark-count probability per pulse
 E_DETECTOR = 0.033        # optical misalignment error (per detected photon)
 MU = 0.5                  # mean photon number per signal pulse (source)
-F_EC = 1.22               # error-correction inefficiency f(E) >= 1
-Q_SIFT = 0.5              # basis-sifting factor q in LMC Eq. 11.
-                          # 1/2 = standard BB84 (half the pulses land in a
-                          # mismatched basis and are discarded). LMC's Fig. 1
-                          # instead uses q = 1 (efficient BB84), so our curves
-                          # sit a factor of 2 lower in R -- but at the SAME
-                          # cutoff distances, since q is only a prefactor.
-                          # Frozen here; flip to 1.0 as a deliberate twist.
-
-
-def transmittance(L, alpha=ALPHA_DB_PER_KM):
-    """
-    Channel transmittance: probability a photon survives L km of fiber.
-    Standard model: eta_channel = 10 ** (-alpha * L / 10)
-    Detector efficiency is NOT included here — it's multiplied in at the
-    gain-model stage (per project decision). This is the single swept
-    variable (via L).
-    """
-    return 10 ** (-alpha * L / 10)
 
 
 def eta_overall(L, eta_det=ETA_DET, alpha=ALPHA_DB_PER_KM):
