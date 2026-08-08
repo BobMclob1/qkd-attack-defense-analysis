@@ -37,6 +37,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared import binary_entropy, transmittance, ALPHA_DB_PER_KM, F_EC, Q_SIFT
 
+# --- BBM92 frozen constants (144 km PDC experiment, MFL Table I) -------------
+# Deduced from the 144 km entangled-PDC experiment [43] that MFL simulate.
+# NOTE these differ from BB84's GYS constants (different experiment/detectors);
+# an overlay of the two protocols is a qualitative comparison, not a controlled
+# one -- flagged on the plot. q and f match the shared values (MFL p.9).
+ETA_DET = 0.145      # detection efficiency per box (detector + internal optics,
+                     # channel loss applied separately in eta_arms). ETA_Alice
+                     # = ETA_Bob = 14.5%.
+ED = 0.015           # intrinsic detector error rate ed (1.5%)
+Y0_BG = 6.02e-6      # per-detector background count rate -> Y0A = Y0B = Y0_BG
+MU = 0.053           # source brightness mu = 2*lam (realistic 144 km value;
+                     # fixed, not optimized -- MFL note optimizing buys ~1 dB)
+
 
 def p_pair(n, lam):
     """
@@ -109,3 +122,128 @@ def yield_n(n, etaA, etaB, Y0A, Y0B):
     click_A = 1 - (1 - Y0A) * (1 - etaA) ** n
     click_B = 1 - (1 - Y0B) * (1 - etaB) ** n
     return click_A * click_B
+
+
+def q_lambda(lam, etaA, etaB, Y0A, Y0B):
+    """
+    Overall gain Q_lambda: probability of a coincidence detection per PUMP
+    PULSE (averaged over the thermal pair-number distribution P(n), Eq. 5).
+
+    MFL Eq. 9 -- the CLOSED FORM of the sum Q_lambda = sum_n Yn * P(n):
+        Q_lambda = 1
+                 - (1 - Y0A) / (1 + etaA*lam)^2
+                 - (1 - Y0B) / (1 + etaB*lam)^2
+                 + (1 - Y0A)(1 - Y0B) / (1 + etaA*lam + etaB*lam - etaA*etaB*lam)^2
+
+    Provenance: MFL derive and PRINT this closed form and state they use it in
+    the simulation, so we code it verbatim (exact, no Poisson-style truncation)
+    rather than the numerical sum. The truncated sum sum_n Yn*P(n) is kept only
+    as an independent validation cross-check (see the sanity test).
+
+    Structure mirrors the coincidence (Eq. 7): the two single-arm subtraction
+    terms are the "only Alice missed / only Bob missed" corrections, and the
+    final add-back term is inclusion-exclusion for "both missed" -- the thermal
+    analogue of Q_mu for BB84, but two-sided.
+    """
+    a = (1 - Y0A) / (1 + etaA * lam) ** 2
+    b = (1 - Y0B) / (1 + etaB * lam) ** 2
+    c = (1 - Y0A) * (1 - Y0B) / (1 + etaA * lam + etaB * lam - etaA * etaB * lam) ** 2
+    return 1 - a - b + c
+
+
+# e0 = 1/2 is the error rate of a background (dark-count) coincidence: it is
+# uncorrelated with Alice's bit, so it is wrong exactly half the time (MFL,
+# App. A). A double click is also assigned a random bit -> e0 = 1/2 as well.
+E0 = 0.5
+
+
+def e_lambda(lam, etaA, etaB, Y0A, Y0B, ed, Q_lam=None, e0=E0):
+    """
+    Overall QBER E_lambda: fraction of coincidence detections that carry the
+    wrong bit, averaged over the thermal distribution.
+
+    MFL Eq. 10 (given in the E_lambda * Q_lambda form):
+        E_lambda * Q_lambda = e0 * Q_lambda
+            - 2(e0 - ed) * etaA*etaB*lam*(1+lam)
+              / [ (1+etaA*lam)(1+etaB*lam)(1+etaA*lam+etaB*lam-etaA*etaB*lam) ]
+
+    so E_lambda = (that RHS) / Q_lambda.
+
+    Reading it: e0*Q_lambda is the "everything is a coin flip" baseline (if
+    every coincidence were random noise, QBER would be e0 = 1/2). The
+    subtracted term is the CORRELATION the true entangled signal restores:
+    genuine single-pair coincidences agree except for the intrinsic
+    misalignment ed, so they pull the error rate down from e0 toward ed. The
+    (e0 - ed) factor is exactly "how much better than a coin flip" a real
+    signal detection is; it is weighted by the signal coincidence rate
+    (the etaA*etaB*lam... factor). As distance grows, that signal factor
+    shrinks, less is subtracted, and E_lambda climbs back up toward e0 = 1/2
+    -- the noise-dominated regime that kills the key.
+
+    ed is the intrinsic detector/misalignment error (the BBM92 analogue of
+    BB84's e_detector). Q_lam may be passed in to avoid recomputing Eq. 9.
+    """
+    if Q_lam is None:
+        Q_lam = q_lambda(lam, etaA, etaB, Y0A, Y0B)
+    denom = ((1 + etaA * lam) * (1 + etaB * lam)
+             * (1 + etaA * lam + etaB * lam - etaA * etaB * lam))
+    signal_term = 2 * (e0 - ed) * etaA * etaB * lam * (1 + lam) / denom
+    return (e0 * Q_lam - signal_term) / Q_lam
+
+
+def koashi_preskill_key_rate(Q_lam, E_lam, f=F_EC, q=Q_SIFT):
+    """
+    Secure key rate per pulse for BBM92 -- the Koashi-Preskill combiner.
+
+    MFL Eq. 11 (with delta_b = delta_p = E_lam from Eq. 12):
+        R >= q * Q_lam * [ 1 - f(E_lam)*H2(E_lam) - H2(E_lam) ]
+
+    Compare BB84's GLLP combiner gllp_key_rate:
+        GLLP:            R = q{ Q1[1-H2(e1)] - Q_mu f H2(E_mu) }
+        Koashi-Preskill: R = q  Q_lam[ 1 - f H2(E_lam) - H2(E_lam) ]
+
+    The two H2 terms:
+      - f * H2(E_lam)  -- ERROR CORRECTION cost (bit error delta_b = E_lam),
+        inflated by the code inefficiency f.
+      - H2(E_lam)      -- PRIVACY AMPLIFICATION cost (phase error delta_p).
+
+    THE KEY POINT (why BBM92 is PNS-resistant, coded right here): there is NO
+    single-photon isolation -- no Q1, no e1. The rate uses only the OVERALL
+    gain Q_lam and OVERALL QBER E_lam. This is legal because the entangled PDC
+    source is BASIS-INDEPENDENT, so Koashi-Preskill can set the phase error
+    delta_p equal to the measured bit error delta_b = E_lam (Eq. 12, from the
+    X/Z measurement symmetry). Privacy amplification then runs over the WHOLE
+    sifted key at rate H2(E_lam). Multi-photon-pair events are not thrown away
+    (as GLLP must); they are already paid for inside E_lam. That is exactly
+    why BBM92 needs no decoy states to survive PNS.
+
+    Consequence: R hits 0 when 1 - (1+f)H2(E_lam) = 0, i.e. H2(E_lam)=1/(1+f).
+    With f=1.22 that is E_lam ~ 9.9%; at the Shannon limit f=1 it is the
+    famous ~11% entanglement-QKD error threshold.
+
+    Returns the RAW bound (may be negative past the cutoff), same convention
+    as the BB84 rates.
+    """
+    h = binary_entropy(E_lam)
+    return q * Q_lam * (1 - f * h - h)
+
+
+def bbm92_key_rate(L, placement, mu=MU, eta_det=ETA_DET, ed=ED, y0=Y0_BG,
+                   f=F_EC, q=Q_SIFT, alpha=ALPHA_DB_PER_KM):
+    """
+    BBM92 secure key rate per pulse at distance L (km) for a source placement.
+
+    The endpoint that ties the model together, one distance at a time:
+        eta_arms (placement) -> Q_lambda (Eq. 9), E_lambda (Eq. 10)
+        -> koashi_preskill_key_rate (Eq. 11).
+
+    lam = mu/2; Y0A = Y0B = y0 (per-detector background, MFL Table I).
+    placement is 'middle' (source midway, each arm L/2) or 'alice' (source at
+    Alice, Bob's arm carries the full L). Returns the RAW bound (may be < 0
+    past the cutoff), same convention as the BB84 rates.
+    """
+    lam = mu / 2
+    etaA, etaB = eta_arms(L, eta_det, placement, alpha)
+    Q = q_lambda(lam, etaA, etaB, y0, y0)
+    E = e_lambda(lam, etaA, etaB, y0, y0, ed, Q_lam=Q)
+    return koashi_preskill_key_rate(Q, E, f=f, q=q)
