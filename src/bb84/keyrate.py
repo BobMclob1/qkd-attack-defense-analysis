@@ -21,15 +21,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from math import exp, factorial
 
-from shared import binary_entropy, ALPHA_DB_PER_KM, transmittance, F_EC, Q_SIFT
+from shared import binary_entropy, ALPHA_DB_PER_KM, transmittance, F_EC, Q_SIFT, GYS
 
-# --- BB84-specific frozen constants (GYS experiment, LMC Fig. 1 validation) ---
-# Named per project convention so they can be un-frozen as "twists" later.
-# (The shared channel/EC/sifting constants ALPHA_DB_PER_KM, F_EC, Q_SIFT are
-# imported from shared above.)
-ETA_DET = 0.045           # Bob's detector efficiency (dimensionless)
-P_DARK = 1.7e-6           # dark-count probability per pulse
-E_DETECTOR = 0.033        # optical misalignment error (per detected photon)
+# --- BB84 device constants ---------------------------------------------------
+# Milestone 6b: the SET-EQUAL device knobs (detector efficiency, misalignment,
+# per-side background) now come from a DeviceParams object -- the SINGLE source
+# of truth shared with BBM92 -- instead of loose per-protocol literals. Default
+# is GYS so the LMC Fig. 1 validation / regression numbers are unchanged; a grid
+# driver runs this engine on MFL by passing MFL.eta_det/.dark/.e_det into the
+# already-parameterized functions below (nothing here is hardwired to GYS but
+# these module defaults).
+ETA_DET = GYS.eta_det     # Bob's detector efficiency (0.045)
+P_DARK = GYS.dark         # per-side background / dark-count probability (1.7e-6)
+E_DETECTOR = GYS.e_det    # optical misalignment error per detected photon (0.033)
+
+# mu stays BB84-specific: a Poisson mean PHOTON number (not BBM92's pair mean),
+# so it is NOT a shared DeviceParams field. Frozen here for validation; becomes
+# an optimized output per distance in Milestone 6c.
 MU = 0.5                  # mean photon number per signal pulse (source)
 
 

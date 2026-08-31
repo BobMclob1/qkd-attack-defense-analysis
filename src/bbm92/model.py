@@ -35,20 +35,26 @@ import sys
 # inside src/bbm92/ (shared.py lives one directory up).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared import binary_entropy, transmittance, ALPHA_DB_PER_KM, F_EC, Q_SIFT
+from shared import binary_entropy, transmittance, ALPHA_DB_PER_KM, F_EC, Q_SIFT, MFL
 
-# --- BBM92 frozen constants (144 km PDC experiment, MFL Table I) -------------
-# Deduced from the 144 km entangled-PDC experiment [43] that MFL simulate.
-# NOTE these differ from BB84's GYS constants (different experiment/detectors);
-# an overlay of the two protocols is a qualitative comparison, not a controlled
-# one -- flagged on the plot. q and f match the shared values (MFL p.9).
-ETA_DET = 0.145      # detection efficiency per box (detector + internal optics,
-                     # channel loss applied separately in eta_arms). ETA_Alice
-                     # = ETA_Bob = 14.5%.
-ED = 0.015           # intrinsic detector error rate ed (1.5%)
-Y0_BG = 6.02e-6      # per-detector background count rate -> Y0A = Y0B = Y0_BG
-MU = 0.053           # source brightness mu = 2*lam (realistic 144 km value;
-                     # fixed, not optimized -- MFL note optimizing buys ~1 dB)
+# --- BBM92 device constants --------------------------------------------------
+# Milestone 6b: the SET-EQUAL device knobs (detector efficiency, misalignment,
+# per-side background) now come from a DeviceParams object -- the SAME single
+# source of truth BB84 uses -- instead of loose literals. Default is MFL so the
+# standalone 144 km sweep is unchanged; the grid driver runs this engine on GYS
+# by passing GYS.eta_det/.dark/.e_det into the already-parameterized
+# bbm92_key_rate below. This is what removes the draft-1 confound (BB84 was on
+# GYS, BBM92 on MFL): a grid COLUMN now feeds identical device knobs to both.
+ETA_DET = MFL.eta_det   # detection efficiency per box (detector + optics,
+                        # channel loss applied separately in eta_arms) = 0.145
+ED = MFL.e_det          # intrinsic detector error rate ed (0.015) = BB84 e_detector
+Y0_BG = MFL.dark        # per-side background count rate -> Y0A = Y0B = Y0_BG (6.02e-6)
+
+# mu stays BBM92-specific: a THERMAL mean PAIR number mu = 2*lam (not BB84's
+# Poisson photon mean), so it is NOT a shared DeviceParams field. Fixed at the
+# realistic 144 km value for now; MFL note optimizing it buys only ~1 dB (App.,
+# so 6c may hold it fixed -- a decision flagged for the grid).
+MU = 0.053           # source brightness mu = 2*lam (realistic 144 km value)
 
 
 def p_pair(n, lam):
