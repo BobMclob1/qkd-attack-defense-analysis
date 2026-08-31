@@ -81,11 +81,6 @@ if __name__ == "__main__":
     ax.set_title("PNS resistance: BB84 (needs decoy) vs BBM92 (intrinsically immune)")
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend(loc="lower left", fontsize=8.5)
-    ax.text(0.99, 0.97,
-            "Qualitative comparison: BB84 = GYS params, BBM92 = 144 km PDC\n"
-            "params (MFL Table I) -- different detectors, not a controlled overlay.",
-            transform=ax.transAxes, ha="right", va="top", fontsize=7.5,
-            color="#555555", style="italic")
     fig.tight_layout()
     fig.savefig(OUTFILE, dpi=150)
     print(f"saved {OUTFILE}")

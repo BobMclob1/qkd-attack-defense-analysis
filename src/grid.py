@@ -173,11 +173,6 @@ def plot_grid(results, outfile=OUTFILE):
                  "colour = protocol, linestyle = parameter set (GYS solid / MFL dashed)")
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend(loc="lower left", fontsize=8.5)
-    ax.text(0.99, 0.97,
-            "Controlled: identical eta_det / e_det / per-side dark fed to both\n"
-            "protocols in each column; $\\mu$ optimized per distance for every curve.",
-            transform=ax.transAxes, ha="right", va="top", fontsize=7.5,
-            color="#555555", style="italic")
     fig.tight_layout()
     fig.savefig(outfile, dpi=150)
     print(f"saved {outfile}")
