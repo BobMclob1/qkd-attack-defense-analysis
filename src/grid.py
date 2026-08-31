@@ -63,10 +63,10 @@ def bb84_best(L, params):
         BB84_MU_MIN, BB84_MU_MAX, MU_NGRID)
 
 
-def bbm92_best(L, params):
-    """Best BBM92 (source@Alice) secure rate at L over mu -> (R_best, mu_best)."""
+def bbm92_best(L, params, placement="alice"):
+    """Best BBM92 secure rate at L over mu for a source placement -> (R_best, mu_best)."""
     return optimize_mu(
-        lambda mu: bbm92_key_rate(L, "alice", mu=mu, eta_det=params.eta_det,
+        lambda mu: bbm92_key_rate(L, placement, mu=mu, eta_det=params.eta_det,
                                   ed=params.e_det, y0=params.dark),
         BBM92_MU_MIN, BBM92_MU_MAX, MU_NGRID)
 
@@ -113,7 +113,8 @@ def plot_table(results, outfile=TABLE_OUTFILE):
     headline quantities R(L=0), optimized mu*(0), and max secure distance.
     """
     protocols = [("BB84 decoy", "BB84 (decoy)"),
-                 ("BBM92 @alice", "BBM92 (no decoy)")]
+                 ("BBM92 @alice", "BBM92 (alice)"),
+                 ("BBM92 @middle", "BBM92 (middle)")]
     col_labels = ["Protocol",
                   "R(L=0)\nGYS", "$\\mu^*$(0)\nGYS", "$d_{max}$\nGYS",
                   "R(L=0)\nMFL", "$\\mu^*$(0)\nMFL", "$d_{max}$\nMFL"]
@@ -126,7 +127,7 @@ def plot_table(results, outfile=TABLE_OUTFILE):
                       f"{rG[0]:.2e}", f"{muG[0]:.3f}", f"{cG:.1f} km",
                       f"{rM[0]:.2e}", f"{muM[0]:.3f}", f"{cM:.1f} km"])
 
-    fig, ax = plt.subplots(figsize=(10, 2.0))
+    fig, ax = plt.subplots(figsize=(10, 2.5))
     ax.axis("off")
     tbl = ax.table(cellText=cells, colLabels=col_labels, loc="center",
                    cellLoc="center", colLoc="center")
@@ -180,11 +181,14 @@ def plot_grid(results, outfile=OUTFILE):
 
 
 if __name__ == "__main__":
+    bbm92_middle = lambda L, p: bbm92_best(L, p, "middle")
     cells = [
         ("BB84 decoy", GYS, bb84_best),
         ("BB84 decoy", MFL, bb84_best),
         ("BBM92 @alice", GYS, bbm92_best),
         ("BBM92 @alice", MFL, bbm92_best),
+        ("BBM92 @middle", GYS, bbm92_middle),
+        ("BBM92 @middle", MFL, bbm92_middle),
     ]
 
     print("Milestone 6d grid -- mu optimized per distance for every cell\n")
