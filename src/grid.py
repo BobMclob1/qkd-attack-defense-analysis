@@ -202,5 +202,5 @@ if __name__ == "__main__":
         cstr = f"{c:.1f} km" if c is not None else "no cutoff"
         print(f"{name:13s} {params.name:6s} {R[0]:12.4e} {mu[0]:9.4f} {cstr:>16s}")
 
-    plot_grid(results)
+    # plot_grid(results)   # grid figure disabled for now (kept for easy re-enable)
     plot_table(results)
