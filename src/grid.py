@@ -103,6 +103,57 @@ STYLE = {
 }
 
 
+TABLE_OUTFILE = os.path.join(REPO_ROOT, "figures", "grid_table.png")
+
+
+def plot_table(results, outfile=TABLE_OUTFILE):
+    """
+    Render the grid results as a table image (for the paper): two protocol rows,
+    the GYS and MFL parameter sets as super-columns, each reporting the three
+    headline quantities R(L=0), optimized mu*(0), and max secure distance.
+    """
+    protocols = [("BB84 decoy", "BB84 (decoy)"),
+                 ("BBM92 @alice", "BBM92 (no decoy)")]
+    col_labels = ["Protocol",
+                  "R(L=0)\nGYS", "$\\mu^*$(0)\nGYS", "$d_{max}$\nGYS",
+                  "R(L=0)\nMFL", "$\\mu^*$(0)\nMFL", "$d_{max}$\nMFL"]
+
+    cells = []
+    for key, disp in protocols:
+        rG, muG, cG = results[(key, "GYS")]
+        rM, muM, cM = results[(key, "MFL")]
+        cells.append([disp,
+                      f"{rG[0]:.2e}", f"{muG[0]:.3f}", f"{cG:.1f} km",
+                      f"{rM[0]:.2e}", f"{muM[0]:.3f}", f"{cM:.1f} km"])
+
+    fig, ax = plt.subplots(figsize=(10, 2.0))
+    ax.axis("off")
+    tbl = ax.table(cellText=cells, colLabels=col_labels, loc="center",
+                   cellLoc="center", colLoc="center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1.0, 2.2)
+    # Shade the header, and tint GYS columns vs MFL columns so the two
+    # controlled parameter sets are visually separated.
+    ncols = len(col_labels)
+    for (r, c), cell in tbl.get_celld().items():
+        if r == 0:
+            cell.set_facecolor("#1f4e79"); cell.set_text_props(color="white", weight="bold")
+        elif c == 0:
+            cell.set_text_props(weight="bold")
+        elif 1 <= c <= 3:
+            cell.set_facecolor("#eaf0f6")          # GYS block
+        elif 4 <= c <= 6:
+            cell.set_facecolor("#f3ecf7")          # MFL block
+    ax.set_title("Milestone 6d grid -- secure rate & reach, $\\mu$ optimized per distance\n"
+                 "(controlled: identical device spec fed to both protocols per column)",
+                 fontsize=10, pad=12)
+    fig.tight_layout()
+    fig.savefig(outfile, dpi=150, bbox_inches="tight")
+    print(f"saved {outfile}")
+    return fig
+
+
 def plot_grid(results, outfile=OUTFILE):
     """
     Controlled grid figure: secure key rate vs distance for all four cells,
@@ -153,3 +204,4 @@ if __name__ == "__main__":
         print(f"{name:13s} {params.name:6s} {R[0]:12.4e} {mu[0]:9.4f} {cstr:>16s}")
 
     plot_grid(results)
+    plot_table(results)
