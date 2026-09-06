@@ -50,11 +50,27 @@ ETA_DET = MFL.eta_det   # detection efficiency per box (detector + optics,
 ED = MFL.e_det          # intrinsic detector error rate ed (0.015) = BB84 e_detector
 Y0_BG = MFL.dark        # per-side background count rate -> Y0A = Y0B = Y0_BG (6.02e-6)
 
-# mu stays BBM92-specific: a THERMAL mean PAIR number mu = 2*lam (not BB84's
-# Poisson photon mean), so it is NOT a shared DeviceParams field. Fixed at the
-# realistic 144 km value for now; MFL note optimizing it buys only ~1 dB (App.,
-# so 6c may hold it fixed -- a decision flagged for the grid).
-MU = 0.053           # source brightness mu = 2*lam (realistic 144 km value)
+# mu is BBM92-specific: a THERMAL mean photon-PAIR number mu = 2*lam (MFL Eq. 5),
+# NOT BB84's Poisson photon mean, so it is NOT a shared DeviceParams field.
+#
+# WHY 0.053: it is the REALISTIC measured brightness of the actual 144 km
+# free-space PDC experiment MFL simulate (their ref [43]). MFL state that in the
+# realistic case mu "cannot be set freely" and fix mu = 2*lam = 0.053 (paper
+# text, "In the realistic case ... mu = 2*lam = 0.053"). They also find the rate
+# is STABLE in mu: the theoretical optimum is mu = O(1), but it beats mu = 0.053
+# by only ~1 dB. So 0.053 is a faithful experimental value, not an arbitrary one.
+#
+# This is the DEFAULT/fixed brightness, kept by two consumers: the standalone
+# BBM92 144 km sweep, and E91 (chsh.py). E91 keeps it FIXED rather than optimized
+# because E91 has no key rate -- its only mu objective would be min-QBER, and that
+# is degenerate: QBER falls monotonically as mu drops until dark-count accidentals
+# take over near mu ~ 4e-5, so "optimizing" just parks the source at that
+# near-off floor for ~2-4 km of extra S=2 reach. (This is the OPPOSITE direction
+# from the rate-optimal mu, which is LARGER because the rate rewards brightness
+# with gain; QBER has no such reward.) The cross-protocol GRID OVERRIDES this
+# default, optimizing mu per distance per Milestone 6c (BBM92 mu*(0) ~ 0.08-0.12)
+# and passing mu into bbm92_key_rate explicitly.
+MU = 0.053           # realistic 144 km PDC brightness mu = 2*lam [MFL, ref 43]
 
 
 def p_pair(n, lam):
