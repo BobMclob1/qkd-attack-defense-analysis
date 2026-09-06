@@ -32,6 +32,7 @@ sys.path.insert(0, _SRC)
 
 from chsh import S_of_distance, S_TSIRELSON, chsh_S, qber_bbm92
 from shared import GYS, MFL
+import grid  # Milestone-6d grid: BBM92 key-rate reach at OPTIMIZED mu, for comparison
 
 OUTFILE = os.path.join(REPO_ROOT, "figures", "e91_chsh_S.png")
 TABLE_OUTFILE = os.path.join(REPO_ROOT, "figures", "e91_table.png")
@@ -82,31 +83,70 @@ def plot_S(outfile=OUTFILE):
     return fig
 
 
+def bbm92_key_reach(placement, params):
+    """
+    BBM92 mu-OPTIMIZED key-rate reach (km) for the same placement/params, pulled
+    from the Milestone-6d grid so it matches grid_table exactly (NOT the fixed-mu
+    native sweep). This is the quantity the E91 S=2 Bell cutoff is compared to.
+    """
+    best = lambda L, p: grid.bbm92_best(L, p, placement)
+    R, _ = grid.run_cell(best, params)
+    return grid.cutoff_distance(grid.L_KM, R)
+
+
 def plot_table(outfile=TABLE_OUTFILE):
-    """Table: GYS and MFL, S(L=0) and the S=2 Bell cutoff for each placement."""
-    col_labels = ["Params", "S(L=0)", "$S{=}2$\n(middle)", "$S{=}2$\n(alice)"]
+    """
+    Comparison table, one row per (params x placement): the E91 S=2 Bell cutoff
+    against the BBM92 key-rate reach at the MATCHING placement. The two are
+    DIFFERENT quantities and sit at DIFFERENT mu policies (see footnote):
+      - S=2 Bell cutoff: fixed native mu=2*lam=0.053 (E91 has no key rate, so no
+        rate to optimize mu against; and the crossing lies past the key cutoff,
+        where a rate-optimal mu would be meaningless).
+      - BBM92 key reach: grid, mu optimized per distance.
+    The GAP is the finding -- certifying entanglement (S=2 <-> QBER 14.6%) is a
+    WEAKER condition than distilling key (QBER ~10%), so the Bell violation
+    outlives the key.
+    """
+    col_labels = ["Params", "Placement", "S(L=0)",
+                  "$S{=}2$ Bell\ncutoff (km)", "BBM92 key-rate\nreach (km)", "gap\n(km)"]
     cells = []
     for params in (MFL, GYS):
         S0 = chsh_S(qber_bbm92(0.0, "middle", params))   # same at L=0 either placement
-        c_mid = s2_crossing("middle", params)
-        c_ali = s2_crossing("alice", params)
-        cells.append([params.name, f"{S0:.3f}", f"{c_mid:.1f} km", f"{c_ali:.1f} km"])
+        for placement in ("middle", "alice"):
+            bell = s2_crossing(placement, params)         # fixed native mu = 0.053
+            key = bbm92_key_reach(placement, params)      # grid, mu optimized per L
+            cells.append([params.name, placement, f"{S0:.3f}",
+                          f"{bell:.1f}", f"{key:.1f}", f"+{bell - key:.1f}"])
 
-    fig, ax = plt.subplots(figsize=(7.5, 1.7))
+    fig, ax = plt.subplots(figsize=(9.5, 2.7))
     ax.axis("off")
     tbl = ax.table(cellText=cells, colLabels=col_labels, loc="center", cellLoc="center")
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(10)
     tbl.scale(1.0, 2.2)
+    tbl.auto_set_column_width(col=list(range(len(col_labels))))
+    # Tint the two compared quantities differently so they don't read as one:
+    # Bell cutoff (E91) light purple, key reach (BBM92) light blue.
     for (r, c), cell in tbl.get_celld().items():
         if r == 0:
             cell.set_facecolor("#6a0dad"); cell.set_text_props(color="white", weight="bold")
         elif c == 0:
             cell.set_text_props(weight="bold")
-    ax.set_title("E91 CHSH value & S=2 Bell cutoff (native MFL vs GYS hardware)\n"
-                 "fair-sampling assumption; depolarizing S<->Q map [Acin et al.]",
+        elif c == 3:
+            cell.set_facecolor("#efe6f7")        # S=2 Bell cutoff (E91 quantity)
+        elif c == 4:
+            cell.set_facecolor("#eaf0f6")        # BBM92 key-rate reach (different quantity)
+    ax.set_title("E91 $S{=}2$ Bell cutoff vs BBM92 key-rate reach (matched placement)",
                  fontsize=9.5, pad=10)
-    fig.tight_layout()
+    fig.text(0.5, 0.02,
+             "$S{=}2$ Bell cutoff computed at the fixed native brightness "
+             "$\\mu{=}2\\lambda{=}0.053$; BBM92 key-rate reach from the grid at $\\mu$ "
+             "optimized per distance.\nE91 has no key rate, so its $\\mu$ is not optimized. "
+             "Gap: entanglement certification holds to QBER 14.6% ($S{=}2$); key "
+             "distillation fails near QBER 10%.\n"
+             "Fair-sampling assumption; depolarizing $S{\\leftrightarrow}Q$ map [Acin et al.].",
+             ha="center", va="bottom", fontsize=7.5, style="italic")
+    fig.subplots_adjust(bottom=0.28)
     fig.savefig(outfile, dpi=150, bbox_inches="tight")
     print(f"saved {outfile}")
     return fig

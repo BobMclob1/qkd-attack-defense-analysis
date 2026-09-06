@@ -127,13 +127,15 @@ def plot_table(results, outfile=TABLE_OUTFILE):
                       f"{rG[0]:.2e}", f"{muG[0]:.3f}", f"{cG:.1f} km",
                       f"{rM[0]:.2e}", f"{muM[0]:.3f}", f"{cM:.1f} km"])
 
-    fig, ax = plt.subplots(figsize=(10, 2.5))
+    fig, ax = plt.subplots(figsize=(10, 2.9))
     ax.axis("off")
     tbl = ax.table(cellText=cells, colLabels=col_labels, loc="center",
                    cellLoc="center", colLoc="center")
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(10)
     tbl.scale(1.0, 2.2)
+    # Fit each column to its widest text so labels like "BBM92 (middle)" are not clipped.
+    tbl.auto_set_column_width(col=list(range(len(col_labels))))
     # Shade the header, and tint GYS columns vs MFL columns so the two
     # controlled parameter sets are visually separated.
     ncols = len(col_labels)
@@ -149,7 +151,15 @@ def plot_table(results, outfile=TABLE_OUTFILE):
     ax.set_title("Milestone 6d grid -- secure rate & reach, $\\mu$ optimized per distance\n"
                  "(controlled: identical device spec fed to both protocols per column)",
                  fontsize=10, pad=12)
-    fig.tight_layout()
+    # State the mu convention explicitly: mu is re-optimized at EVERY distance to
+    # maximize the secure rate; mu*(0) is that optimal mu at zero distance, and
+    # d_max is the reach under the same per-distance optimization.
+    fig.text(0.5, 0.02,
+             "$\\mu$ optimized per protocol per distance to maximize secure rate. "
+             "$\\mu^*$(0) = optimal $\\mu$ at zero distance; "
+             "$R$(L=0) and $d_{max}$ are evaluated under that same per-distance optimization.",
+             ha="center", va="bottom", fontsize=8, style="italic")
+    fig.subplots_adjust(bottom=0.12)
     fig.savefig(outfile, dpi=150, bbox_inches="tight")
     print(f"saved {outfile}")
     return fig
