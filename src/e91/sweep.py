@@ -138,15 +138,14 @@ def plot_table(outfile=TABLE_OUTFILE):
             cell.set_facecolor("#eaf0f6")        # BBM92 key-rate reach (different quantity)
     ax.set_title("E91 $S{=}2$ Bell cutoff vs BBM92 key-rate reach (matched placement)",
                  fontsize=9.5, pad=10)
-    fig.text(0.5, 0.02,
+    fig.text(0.5, 0.03,
              "$S{=}2$ Bell cutoff computed at the fixed native brightness "
              "$\\mu{=}2\\lambda{=}0.053$; BBM92 key-rate reach from the grid at $\\mu$ "
              "optimized per distance.\nE91 has no key rate, so its $\\mu$ is not optimized. "
-             "Gap: entanglement certification holds to QBER 14.6% ($S{=}2$); key "
-             "distillation fails near QBER 10%.\n"
-             "Fair-sampling assumption; depolarizing $S{\\leftrightarrow}Q$ map [Acin et al.].",
+             "Gap: entanglement is still certified at QBER 14.6% ($S{=}2$), but BBM92 "
+             "makes no key past QBER 10%.",
              ha="center", va="bottom", fontsize=7.5, style="italic")
-    fig.subplots_adjust(bottom=0.28)
+    fig.subplots_adjust(bottom=0.20)
     fig.savefig(outfile, dpi=150, bbox_inches="tight")
     print(f"saved {outfile}")
     return fig
