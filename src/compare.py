@@ -63,11 +63,11 @@ if __name__ == "__main__":
     bbm92_ali = np.array([bbm92_key_rate(x, "alice") for x in L])
 
     curves = [
-        ("BB84 ceiling (infinite decoy)", bb84_ceiling, "#1f4e79", "--"),
+        ("BB84 infinite-decoy limit", bb84_ceiling, "#1f4e79", "--"),
         ("BB84 + decoy (Vacuum+Weak)", bb84_decoy, "#2e8b57", "-"),
         ("BB84 NO decoy (PNS crash)", bb84_nodecoy, "#c0392b", "-"),
-        ("BBM92 no decoy - source middle", bbm92_mid, "#6a0dad", "-"),
-        ("BBM92 no decoy - source at Alice", bbm92_ali, "#e67e22", "-"),
+        ("BBM92 (no decoy required) - source middle", bbm92_mid, "#6a0dad", "-"),
+        ("BBM92 (no decoy required) - source at Alice", bbm92_ali, "#e67e22", "-"),
     ]
 
     fig, ax = plt.subplots(figsize=(9.5, 6))
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         ax.semilogy(L, _mask(R), color=color, ls=ls, lw=2, label=label + ctxt)
 
     ax.set_xlabel("Distance L (km)")
-    ax.set_ylabel("Secure key rate R (per pulse)")
+    ax.set_ylabel("Secure key rate R (bits per pulse)")
     ax.set_title("PNS resistance: BB84 (needs decoy) vs BBM92 (intrinsically immune)")
     ax.grid(True, which="both", ls=":", alpha=0.5)
     ax.legend(loc="lower left", fontsize=8.5)
@@ -87,4 +87,4 @@ if __name__ == "__main__":
 
     for label, R, _, _ in curves:
         c = _cutoff(L, R)
-        print(f"  {label:38s} cutoff ~ {c:.1f} km" if c else f"  {label}: no cutoff")
+        print(f"  {label:44s} cutoff ~ {c:.1f} km" if c else f"  {label}: no cutoff")
