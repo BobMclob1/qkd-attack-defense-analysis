@@ -21,7 +21,11 @@ _SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_ROOT = os.path.dirname(_SRC)
 sys.path.insert(0, _SRC)
 OUTFILE = os.path.join(REPO_ROOT, "figures", "bbm92_key_rate.png")
-TABLE_OUTFILE = os.path.join(REPO_ROOT, "figures", "bbm92_table.png")
+# NOTE: the standalone BBM92 results TABLE was removed -- grid_table.png
+# supersedes it (grid uses mu OPTIMIZED per distance; this sweep used the fixed
+# native mu=0.053, giving a different BBM92 R(L=0), so keeping both would print
+# two unexplained BBM92 values in the paper). This module now emits the FIGURE
+# only; the numeric BBM92 results live in the grid.
 
 from model import bbm92_key_rate
 from shared import GYS, MFL
@@ -72,40 +76,9 @@ def plot_bbm92(L_km, outfile=OUTFILE):
     return fig
 
 
-def plot_table(L_km, outfile=TABLE_OUTFILE):
-    """Table: GYS and MFL, R(L=0) and the cutoff for each placement."""
-    col_labels = ["Params", "R(L=0)", "cutoff\n(middle)", "cutoff\n(alice)"]
-    cells = []
-    for params in (MFL, GYS):
-        R0 = bbm92_key_rate(0.0, "middle", eta_det=params.eta_det,
-                            ed=params.e_det, y0=params.dark)   # same at L=0 either placement
-        c_mid = cutoff_distance(L_km, sweep_bbm92(L_km, "middle", params))
-        c_ali = cutoff_distance(L_km, sweep_bbm92(L_km, "alice", params))
-        cells.append([params.name, f"{R0:.2e}", f"{c_mid:.1f} km", f"{c_ali:.1f} km"])
-
-    fig, ax = plt.subplots(figsize=(7.5, 1.7))
-    ax.axis("off")
-    tbl = ax.table(cellText=cells, colLabels=col_labels, loc="center", cellLoc="center")
-    tbl.auto_set_font_size(False)
-    tbl.set_fontsize(10)
-    tbl.scale(1.0, 2.2)
-    for (r, c), cell in tbl.get_celld().items():
-        if r == 0:
-            cell.set_facecolor("#6a0dad"); cell.set_text_props(color="white", weight="bold")
-        elif c == 0:
-            cell.set_text_props(weight="bold")
-    ax.set_title("BBM92 secure key rate & reach (native MFL vs GYS hardware)",
-                 fontsize=10, pad=10)
-    fig.tight_layout()
-    fig.savefig(outfile, dpi=150, bbox_inches="tight")
-    print(f"saved {outfile}")
-    return fig
-
-
 if __name__ == "__main__":
     L_km = np.linspace(L_MIN_KM, L_MAX_KM, L_POINTS)
     plot_bbm92(L_km)
-    plot_table(L_km)
     print("\nBBM92 cutoffs (km):")
     for params in (MFL, GYS):
         for placement in ("middle", "alice"):
