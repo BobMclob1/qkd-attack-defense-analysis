@@ -23,6 +23,8 @@ are bare, not package-qualified):
 cd src/bb84 && python3 sweep.py     # BB84 Pair-1 3-curve figure + cutoffs
 cd src/bbm92 && python3 sweep.py    # BBM92 both-placement figure + cutoffs
 cd src   && python3 compare.py      # cross-protocol BB84-vs-BBM92 overlay
+cd src   && python3 grid.py         # Milestone-6d {BB84,BBM92}x{GYS,MFL} grid table (μ-optimized)
+cd src/e91 && python3 sweep.py      # Milestone-7 E91 S(L) figure + S=2 Bell cutoffs
 ```
 
 There is no test runner. **The regression guard is the printed cutoff table** — after any
@@ -46,17 +48,22 @@ key-rate combiner — see the Scope table for why (basis-dependent vs basis-inde
 
 ```
 src/shared.py         binary_entropy · transmittance (fiber loss) · ALPHA/F_EC/Q_SIFT
-  │                   the ONLY cross-protocol code. Both engines import from it.
+  │                   + DeviceParams and the GYS/MFL constant sets + optimize_mu (6c).
+  │                   the ONLY cross-protocol code. Every engine imports from it.
   ├── src/bb84/       Poisson/WCP engine → GLLP combiner (LMC Eq. 11)
   │     keyrate.py      device model (Y_n,Q_μ,E_μ,Q_1,e_1) + gllp_key_rate combiner ← hub
   │     ceiling.py      infinite-decoy ceiling: TRUE Y_1/e_1 → gllp_key_rate
   │     no_decoy.py     PNS-crash bound (Ω, Eq.12/13) + optimize_no_decoy (μ-scan)
   │     decoy.py        Vacuum+Weak decoy estimators (MQZL 34/35/37) → gllp_key_rate
   │     sweep.py        distance sweep + Pair-1 figure
-  └── src/bbm92/      thermal/SPDC engine → Koashi–Preskill combiner (MFL Eq. 11)
-        model.py        pair stats · eta_arms(placement) · Q_λ,E_λ · koashi_preskill + bbm92_key_rate
-        sweep.py        distance sweep + both-placement figure
-src/compare.py        imports both engines, draws the qualitative overlay
+  ├── src/bbm92/      thermal/SPDC engine → Koashi–Preskill combiner (MFL Eq. 11)
+  │     model.py        pair stats · eta_arms(placement) · Q_λ,E_λ · koashi_preskill + bbm92_key_rate
+  │     sweep.py        distance sweep + both-placement figure
+  └── src/e91/        E91 as S(L) — reuses the BBM92 device layer UNCHANGED (Milestone 7)
+        chsh.py         qber_bbm92(L) → chsh_S depolarizing map S=2√2(1−2Q) → S_of_distance
+        sweep.py        S(L) figure + S=2 Bell-cutoff table (NOT a key-rate cutoff)
+src/compare.py        imports BB84+BBM92 engines, draws the qualitative overlay
+src/grid.py           Milestone-6d controlled {BB84,BBM92}×{GYS,MFL} grid → grid_table.png
 ```
 
 Key structural facts to know before editing:
@@ -67,9 +74,12 @@ Key structural facts to know before editing:
   Clamping/masking to `NaN` and locating the zero-crossing (`cutoff_distance`) is the
   sweep layer's job — never clamp inside a rate function; the sign change *is* the result.
 - **The single swept variable is distance L.** Everything else is a frozen module-level
-  constant (per the Frozen-constants rule) except μ, which is optimized only in
-  `no_decoy.optimize_no_decoy`. GYS constants live in `bb84/keyrate.py`; MFL 144 km
-  constants live in `bbm92/model.py` — they intentionally differ (see Milestone 6).
+  constant (per the Frozen-constants rule) except μ, which is optimized via `optimize_mu`
+  (shared.py) in `no_decoy.optimize_no_decoy` and in every `grid.py` cell.
+- **The GYS and MFL constant sets are `DeviceParams` objects in `shared.py`** (the single
+  source of truth). `bb84/keyrate.py` and `bbm92/model.py` each pull their *native* default
+  from there (`GYS.*` and `MFL.*` respectively) so the standalone single-protocol figures are
+  unchanged; `grid.py` feeds the *other* set in to run the controlled cross-parameter columns.
 - **BBM92 `placement`** (`"middle"` vs `"alice"`) is the source-geometry fork in
   `eta_arms`; `"alice"` mirrors BB84's one-sided loss and is the Milestone-6d primary.
 
@@ -81,7 +91,7 @@ Three protocols. Two are fully computed; the third is partially computed.
 |---|---|---|---|
 | BB84 | WCP, Poisson | QBER | Full — ceiling / PNS crash / decoy recovery |
 | BBM92 | SPDC, thermal | QBER | Full — Koashi–Preskill rate, no decoy |
-| E91 | SPDC, thermal | CHSH value S | **S(L) curve only — no key rate** |
+| E91 | SPDC, thermal | CHSH value S | **S(L) curve + S=2 Bell cutoff — no key rate (done, Milestone 7)** |
 
 BB84 and BBM92 share QBER-based *infrastructure* (binary entropy, channel/loss model,
 frozen constants, the sweep/plot harness) but use **protocol-specific key-rate formulas**
@@ -124,10 +134,12 @@ Output: secure key rate R vs distance — plot the SECURE rate, never apparent t
 2. BB84 Pair 1: ceiling / PNS crash / decoy recovery. ✅ done
 3. BBM92 Pair 1 (entangled PDC source — MFL, Koashi–Preskill rate; foreground intrinsic
    PNS-resistance vs BB84). ✅ done
-4. Pair 2 (intercept-resend) both protocols.
-5. Interpretation + optional twist (un-freeze dark counts).
-6. **Parameter control — the 2×2 grid.** ← current, blocks everything downstream
-7. **E91 as S(L).** Gated on Milestone 6 confirmation + source verification.
+4. Pair 2 (intercept-resend) both protocols. ✅ done
+5. Interpretation + optional twist (un-freeze dark counts). ✅ done
+6. **Parameter control — the 2×2 grid.** ✅ done — `src/grid.py` → `grid_table.png`.
+7. **E91 as S(L).** ✅ done — sources verified (Ekert, Acín in `refs/`), depolarizing fork
+   resolved to Option 1; `src/e91/` → `e91_chsh_S.png` + `e91_table.png`. ← current work is
+   deciding whether E91 gets a key rate at all (Acín rate-from-S), which would reopen scope.
 
 ---
 
@@ -181,15 +193,19 @@ paper; the thesis is "BBM92 needs no decoy patch," not "BBM92 reaches farther."
 Reuse the BBM92 device layer unchanged. It already yields E(L). Map E to the CHSH value S,
 plot S vs distance, report the S = 2 crossing.
 
-**Blocked until sources are verified.** Do not code an S–QBER relation from memory.
-Candidates to pull into `refs/`: Ekert PRL **67**, 661 (1991); Acín *et al.* PRL **98**,
-230501 (2007); Pironio *et al.* NJP **11**, 045021 (2009). All three unverified.
+**Sources — verified and in `refs/`** (unblocked): Ekert PRL **67**, 661 (1991)
+[`refs/91_Ekert.pdf`]; Acín *et al.* PRL **98**, 230501 (2007), quant-ph/0702152v2
+[`refs/0702152v2.pdf`] — the depolarizing relation `S = 2√2(1−2Q)` (Acín p.4) and the
+rate-from-S bounds Eq. (3) DI / Eq. (8) trusted. (Pironio *et al.* not pulled — not needed for
+the S(L) curve.) Do not code an S–QBER relation from memory; it is coded in `src/e91/chsh.py`
+with the equation line cited.
 
-**Modeling fork — surface, do not decide.** The clean QBER→CHSH map assumes a depolarizing
-channel. Dark counts are not depolarizing; they degrade visibility by a different mechanism.
-Options: (1) adopt the depolarizing approximation and state it, or (2) model visibility
-directly from the coincidence statistics already in the BBM92 gain model. Present both with
-costs. Do not pick one.
+**Modeling fork — RESOLVED to Option 1.** The QBER→CHSH map assumes a depolarizing channel;
+dark counts are not depolarizing, so feeding `E_lambda` through it is an approximation, not an
+identity. Option (1) adopt the depolarizing approximation and state it — **chosen** (see the
+`chsh.py` docstring). Option (2) visibility from coincidence statistics — not taken. This
+fork is decided; the *new* open question (see Build order #7) is whether to add an Acín
+rate-from-S at all, which would reopen "E91 gets no key rate" below.
 
 **Reporting caveat:** S = 2 is *not* a key-rate cutoff — it is where entanglement stops being
 certifiable, and the rate may already be zero well before it. Any table or figure comparing
