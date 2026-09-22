@@ -65,7 +65,7 @@ def note(ax, y, text, **kw):
 
 def panel(ax, title):
     ax.set_xlim(0, 4.0)
-    ax.set_ylim(0, 2.85)
+    ax.set_ylim(0, 3.05)
     ax.axis("off")
     ax.set_title(title, fontsize=FS_TITLE, pad=4)
 
@@ -79,7 +79,7 @@ box(ax, XA, 2.30, "Alice")
 box(ax, XB, 2.30, "Bob")
 dot(ax, XA + 0.62, 2.30, color=SRC_WCP)
 arrow(ax, XA + 0.75, XB - 0.52, 2.30)
-note(ax, 2.56, "attenuated laser:  one photon per pulse")
+note(ax, 2.78, "attenuated laser:  one photon per pulse")
 ax.text(XA, 1.88, r"prepares $+$ / $\times$", ha="center",
         fontsize=FS_SMALL, color=INK)
 ax.text(XB, 1.88, r"measures $+$ / $\times$", ha="center",
@@ -96,7 +96,7 @@ box(ax, XB, 2.30, "Bob")
 dot(ax, XS, 2.30)
 arrow(ax, XS - 0.10, XA + 0.52, 2.30)
 arrow(ax, XS + 0.10, XB - 0.52, 2.30)
-note(ax, 2.56, r"source in the middle:  each arm $L/2$")
+note(ax, 2.78, r"source in the middle:  each arm $L/2$")
 ax.text(XA, 1.90, r"$+$ / $\times$", ha="center",
         fontsize=FS_SMALL, color=INK)
 ax.text(XB, 1.90, r"$+$ / $\times$", ha="center",
@@ -120,7 +120,7 @@ box(ax, XB, 2.30, "Bob")
 dot(ax, XS, 2.30)
 arrow(ax, XS - 0.10, XA + 0.52, 2.30)
 arrow(ax, XS + 0.10, XB - 0.52, 2.30)
-note(ax, 2.60, "entangled pair source")
+note(ax, 2.78, "entangled pair source")
 ax.text(XA, 1.88, r"$a_1, a_2, a_3$", ha="center",
         fontsize=FS_SMALL, color=INK)
 ax.text(XB, 1.88, r"$b_1, b_2, b_3$", ha="center",
