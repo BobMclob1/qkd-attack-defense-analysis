@@ -18,11 +18,19 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+# CJSJ journal typography: Times New Roman 8pt for ALL figure text, STIX math to
+# match. Styling only -- no computation, parameter, or curve is affected.
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"] = ["Times New Roman", "Nimbus Roman", "DejaVu Serif"]
+plt.rcParams["font.size"] = 8
+plt.rcParams["mathtext.fontset"] = "stix"
+plt.rcParams["pdf.fonttype"] = 42   # TrueType embedding; IEEE/CJSJ reject Type 3
+
 # Repo root = three levels up from this file (src/bb84/sweep.py -> repo), so
 # figures/ resolves correctly no matter which directory the script is run from.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_clean_keyrate.png")
-PAIR1_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_pair1_pns_crash.png")
+PAIR1_OUTFILE = os.path.join(REPO_ROOT, "figures", "bb84_pair1_pns_crash.pdf")
 
 from keyrate import e_1, eta_overall, MU, P_DARK, E_DETECTOR, F_EC, Q_SIFT
 from ceiling import ceiling_key_rate
@@ -131,12 +139,15 @@ def plot_key_rate(L_km, R, cutoff=None, outfile=DEFAULT_OUTFILE):
     return fig
 
 
-def plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy, insecurity, outfile=PAIR1_OUTFILE):
+def plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy, outfile=PAIR1_OUTFILE):
     """
     Milestone-2 Pair-1 plot: the three-curve PNS story -- infinite-decoy
-    ceiling, practical Vacuum+Weak decoy RECOVERY, and no-decoy PNS crash --
-    plus the insecurity bound, reproducing LMC Fig. 1. Insecure points
-    (R <= 0) are masked so each curve ends at its own cutoff.
+    ceiling, practical Vacuum+Weak decoy RECOVERY, and no-decoy PNS crash.
+    Insecure points (R <= 0) are masked so each curve ends at its own cutoff.
+
+    The e_1 = 1/4 insecurity bound (intercept-resend, Pair 2) is intentionally
+    NOT drawn: it is not discussed in the paper. insecurity_distance() and its
+    printout are kept in __main__ as the Milestone-6a regression guard.
     """
     # Cutoffs from the RAW (signed) arrays passed in, BEFORE masking -- do not
     # re-run the sweeps (the no-decoy sweep is ~220k rate evals).
@@ -154,15 +165,13 @@ def plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy, insecurity, outfile=PAIR1_O
                 label=f"Vacuum+Weak decoy ($\\nu={NU}$, MQZL)  cutoff $\\approx${c_decoy:.0f} km")
     ax.semilogy(L_km, R_no_decoy, color="#c0392b", lw=2,
                 label=f"GLLP no decoy ($\\mu$ re-opt., PNS crash)  cutoff $\\approx${c_nod:.0f} km")
-    ax.axvline(insecurity, color="#555555", ls="--", lw=1.2,
-               label=f"insecurity bound ($e_1=1/4$) $\\approx${insecurity:.0f} km")
 
-    ax.set_xlabel("Distance L (km)")
-    ax.set_ylabel("Secure key rate R (per pulse)")
+    ax.set_xlabel("Distance (km)")
+    ax.set_ylabel("Secure key rate (per pulse)")
     ax.set_title("BB84 Pair 1: PNS attack — decoy recovery vs no-decoy crash\n"
                  f"(GYS params, $q={Q_SIFT}$, $f={F_EC}$)")
     ax.grid(True, which="both", ls=":", alpha=0.5)
-    ax.legend(loc="lower left", fontsize=9)
+    ax.legend(loc="lower left")
     fig.tight_layout()
     fig.savefig(outfile, dpi=150)
     print(f"saved {outfile}")
@@ -182,4 +191,4 @@ if __name__ == "__main__":
     print(f"no-decoy crash cutoff ~ {cutoff_distance(L_km, R_no_decoy):.1f} km")
     print(f"insecurity bound (e_1=1/4) ~ {insecurity:.1f} km")
 
-    plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy, insecurity)
+    plot_pair1(L_km, R_ceiling, R_decoy, R_no_decoy)

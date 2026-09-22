@@ -25,6 +25,14 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+# CJSJ journal typography: Times New Roman 8pt for ALL figure text, STIX math to
+# match. Styling only -- no computation, parameter, or curve is affected.
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"] = ["Times New Roman", "Nimbus Roman", "DejaVu Serif"]
+plt.rcParams["font.size"] = 8
+plt.rcParams["mathtext.fontset"] = "stix"
+plt.rcParams["pdf.fonttype"] = 42   # TrueType embedding; IEEE/CJSJ reject Type 3
+
 _SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_ROOT = os.path.dirname(_SRC)
 sys.path.insert(0, os.path.join(_SRC, "bbm92"))
@@ -34,7 +42,7 @@ from chsh import S_of_distance, S_TSIRELSON, chsh_S, qber_bbm92
 from shared import GYS, MFL
 import grid  # Milestone-6d grid: BBM92 key-rate reach at OPTIMIZED mu, for comparison
 
-OUTFILE = os.path.join(REPO_ROOT, "figures", "e91_chsh_S.png")
+OUTFILE = os.path.join(REPO_ROOT, "figures", "e91_chsh_S.pdf")
 TABLE_OUTFILE = os.path.join(REPO_ROOT, "figures", "e91_table.png")
 
 L_MAX_KM = 360.0
@@ -66,17 +74,17 @@ def plot_S(outfile=OUTFILE):
         S = np.array([S_of_distance(L, placement, MFL) for L in L_KM])
         c_bell = s2_crossing(placement, MFL)
         ax.plot(L_KM, S, color=color, ls=ls, lw=2,
-                label=f"source {placement}   Bell $S{{=}}2\\approx${c_bell:.0f} km")
+                label=f"source {placement}   Bell $S{{=}}2\\approx${c_bell:.1f} km")
     ax.axhline(2.0, color="#c00000", ls="--", lw=1.3, label="classical bound $S=2$")
     ax.axhline(S_TSIRELSON, color="#888888", ls=":", lw=1,
                label="Tsirelson $2\\sqrt{2}$ (ideal singlet)")
-    ax.set_xlabel("Distance L (km)")
+    ax.set_xlabel("Distance (km)")
     ax.set_ylabel("CHSH value S")
     ax.set_title("E91 as S(L): CHSH value vs distance (native MFL params, fixed $\\mu$)\n"
                  "both source placements; $S=2$ is a Bell cutoff, NOT a key-rate cutoff")
     ax.set_ylim(1.4, 2.95)
     ax.grid(True, ls=":", alpha=0.5)
-    ax.legend(loc="lower left", fontsize=8.5)
+    ax.legend(loc="lower left")
     fig.tight_layout()
     fig.savefig(outfile, dpi=150)
     print(f"saved {outfile}")
